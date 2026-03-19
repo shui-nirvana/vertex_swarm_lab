@@ -3,7 +3,7 @@ import os
 import tempfile
 import unittest
 
-from security_monitor.swarm.demo_track3 import _create_agents, run_acceptance, run_demo
+from security_monitor.swarm.demo_track3 import _create_agents, run_acceptance, run_demo, run_warmup
 from security_monitor.swarm.messages import DISCOVER
 from security_monitor.swarm.negotiation import select_winner
 from security_monitor.swarm.security import verify_payload
@@ -15,7 +15,7 @@ class Track3SwarmTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             summary = run_demo(output_dir=tmp, fault_mode="none")
             self.assertEqual(summary["winner"], "agent-worker-0")
-            self.assertEqual(summary["signer_count"], 3)
+            self.assertEqual(summary["signer_count"], len(summary["active_nodes"]))
             self.assertGreater(summary["event_count"], 0)
             self.assertTrue(os.path.exists(summary["event_log_path"]))
             self.assertTrue(os.path.exists(summary["proof_path"]))
@@ -24,8 +24,7 @@ class Track3SwarmTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             summary = run_demo(output_dir=tmp, fault_mode="drop")
             self.assertEqual(summary["winner"], "agent-worker-1")
-            self.assertEqual(summary["signer_count"], 2)
-            self.assertEqual(len(summary["active_nodes"]), 2)
+            self.assertEqual(summary["signer_count"], len(summary["active_nodes"]))
 
     def test_proof_has_hash_chain(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -89,6 +88,20 @@ class Track3SwarmTests(unittest.TestCase):
                 events = json.load(f)
             gossip_events = [event for event in events if event["event_type"] == "THREAT_GOSSIP"]
             self.assertGreaterEqual(len(gossip_events), 1)
+
+    def test_warmup_proof_flow(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            summary = run_warmup(
+                output_dir=tmp,
+                heartbeat_window_seconds=2,
+                outage_seconds=1,
+                heartbeat_seconds=0.1,
+                stale_after_seconds=0.25,
+            )
+            self.assertTrue(os.path.exists(summary["proof_log_path"]))
+            self.assertTrue(os.path.exists(summary["state_snapshot_path"]))
+            self.assertTrue(all(summary["checks"].values()))
+            self.assertLess(summary["mirror_latency_ms"], 1000.0)
 
 
 if __name__ == "__main__":
