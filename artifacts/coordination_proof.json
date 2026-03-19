@@ -1,0 +1,352 @@
+{
+  "event_count": 23,
+  "final_chain_hash": "9289d4b7934f1657b7f2046ce645594bf6076f1a9eddbbeede327639124d07aa",
+  "chain": [
+    {
+      "event": {
+        "ts": 1773592621.5685742,
+        "actor": "agent-scout",
+        "event_type": "DISCOVER",
+        "payload": {
+          "capability": "scout"
+        }
+      },
+      "event_digest": "1e98595958f1f5302c8b76831973530f4540af4b80fdb9725c30da4e641d980b",
+      "prev_hash": "GENESIS",
+      "chain_hash": "e543d3ce4fceae1c40f1c7d4402383c8bf52783db6118648f04cacec6450ec7a"
+    },
+    {
+      "event": {
+        "ts": 1773592621.5685742,
+        "actor": "agent-worker-0",
+        "event_type": "DISCOVER",
+        "payload": {
+          "capability": "guardian"
+        }
+      },
+      "event_digest": "57e1681d88736146c7cc8816912076c0471845aef25309630bd988852a6b5cb5",
+      "prev_hash": "e543d3ce4fceae1c40f1c7d4402383c8bf52783db6118648f04cacec6450ec7a",
+      "chain_hash": "c7e12cb46f6198648e4f5052cfdfea92c91f0b642ef8885610549b9b319cd4ba"
+    },
+    {
+      "event": {
+        "ts": 1773592621.5685742,
+        "actor": "agent-worker-1",
+        "event_type": "DISCOVER",
+        "payload": {
+          "capability": "guardian"
+        }
+      },
+      "event_digest": "56693f446b4071a31b4f4b4c0c389513899c4719bce689aea7f1330b615ca012",
+      "prev_hash": "c7e12cb46f6198648e4f5052cfdfea92c91f0b642ef8885610549b9b319cd4ba",
+      "chain_hash": "71db44863aa2fff6b21b1dcd0c4019b7693e0100ed3a66f7d6b1b53d8b15bb27"
+    },
+    {
+      "event": {
+        "ts": 1773592621.5685742,
+        "actor": "agent-verifier",
+        "event_type": "DISCOVER",
+        "payload": {
+          "capability": "verifier"
+        }
+      },
+      "event_digest": "a74c54ce3202baaf8f3cb3f62bd16e6cc6b2f4ed8b32eee340cabee48fc519cd",
+      "prev_hash": "71db44863aa2fff6b21b1dcd0c4019b7693e0100ed3a66f7d6b1b53d8b15bb27",
+      "chain_hash": "dea46deff3081562e85999cee46de6b0b3da2b967ae639eb34ba297aa5641755"
+    },
+    {
+      "event": {
+        "ts": 1773592621.5685742,
+        "actor": "agent-scout",
+        "event_type": "HEARTBEAT",
+        "payload": {
+          "capability": "scout"
+        }
+      },
+      "event_digest": "2ca902fe2df89b7f527edb5b2a514c040e49479a807410de1d59189c02cbf985",
+      "prev_hash": "dea46deff3081562e85999cee46de6b0b3da2b967ae639eb34ba297aa5641755",
+      "chain_hash": "2ae1bf0d543ac85d2c288de7fc9ca781ee96d8418c42953d90a9725ceba1564c"
+    },
+    {
+      "event": {
+        "ts": 1773592621.5685742,
+        "actor": "agent-worker-0",
+        "event_type": "HEARTBEAT",
+        "payload": {
+          "capability": "guardian"
+        }
+      },
+      "event_digest": "20ed44861016c842b0202b15cfc7f3cd2b6334b7c44ecec3f0d0ddb5b913e888",
+      "prev_hash": "2ae1bf0d543ac85d2c288de7fc9ca781ee96d8418c42953d90a9725ceba1564c",
+      "chain_hash": "f05632a649b1ad0e931bb539835b0bd808ebf07f5ece898c065fb11042578fd0"
+    },
+    {
+      "event": {
+        "ts": 1773592621.5685742,
+        "actor": "agent-worker-1",
+        "event_type": "HEARTBEAT",
+        "payload": {
+          "capability": "guardian"
+        }
+      },
+      "event_digest": "816e96277623ca588c1ebba54768c2c276dd7be72870c6768b850b59c6e3d6b6",
+      "prev_hash": "f05632a649b1ad0e931bb539835b0bd808ebf07f5ece898c065fb11042578fd0",
+      "chain_hash": "1c73e3bf9856a54cf578436006939b416628b1096e70c86205c71aabfb19cb4a"
+    },
+    {
+      "event": {
+        "ts": 1773592621.5685742,
+        "actor": "agent-verifier",
+        "event_type": "HEARTBEAT",
+        "payload": {
+          "capability": "verifier"
+        }
+      },
+      "event_digest": "d18c6529b9b8dfab9f4f7e0957d9d278fa67c24fa0f79ddff8676cf8ed86db9f",
+      "prev_hash": "1c73e3bf9856a54cf578436006939b416628b1096e70c86205c71aabfb19cb4a",
+      "chain_hash": "7a0582b9b5fd4be51e1c170e065300a5fa191b73108d8761bf30db54d53b4174"
+    },
+    {
+      "event": {
+        "ts": 1773592621.5685742,
+        "actor": "agent-scout",
+        "event_type": "TASK_OFFER",
+        "payload": {
+          "task_id": "task-001",
+          "mission": "0x1234567890abcdef1234567890abcdef12345678",
+          "budget_ceiling": 5.0,
+          "constraints": {
+            "latency_ms_max": 500
+          }
+        }
+      },
+      "event_digest": "e75f40e165e167be3b36db08078d020e0abfbef30cdf9a8a29dc8177089b210f",
+      "prev_hash": "7a0582b9b5fd4be51e1c170e065300a5fa191b73108d8761bf30db54d53b4174",
+      "chain_hash": "d5c3589f164b523f9bcf1602f0762f0f400985da800224b382d4e113cdec0838"
+    },
+    {
+      "event": {
+        "ts": 1773592621.5685742,
+        "actor": "agent-worker-0",
+        "event_type": "BID",
+        "payload": {
+          "task_id": "task-001",
+          "agent_id": "agent-worker-0",
+          "price": 5.0,
+          "eta_ms": 200,
+          "capacity": 1
+        }
+      },
+      "event_digest": "9219af5b6b0556601fd819332720b798febb31c18d8ec877e24fb623417e96cd",
+      "prev_hash": "d5c3589f164b523f9bcf1602f0762f0f400985da800224b382d4e113cdec0838",
+      "chain_hash": "6f30deaab9d1e3e0dcac6d3df2d7e2e7880945479632c18fa2e0a876a75a949d"
+    },
+    {
+      "event": {
+        "ts": 1773592621.5685742,
+        "actor": "agent-worker-1",
+        "event_type": "BID",
+        "payload": {
+          "task_id": "task-001",
+          "agent_id": "agent-worker-1",
+          "price": 5.5,
+          "eta_ms": 195,
+          "capacity": 1
+        }
+      },
+      "event_digest": "6a8703a47b41a72ea67c51cf4dd7c24dea45ac05f4fae379931d63ff74e4429a",
+      "prev_hash": "6f30deaab9d1e3e0dcac6d3df2d7e2e7880945479632c18fa2e0a876a75a949d",
+      "chain_hash": "f19c19f71c57c03a8a8ad608644a91994a664dd0d67e9cd4db9ee9c015156a2a"
+    },
+    {
+      "event": {
+        "ts": 1773592621.5685742,
+        "actor": "agent-scout",
+        "event_type": "COMMIT_VOTE",
+        "payload": {
+          "task_id": "task-001",
+          "voter": "agent-scout",
+          "winner": "agent-worker-0",
+          "digest": "c5fa3fac632be4ab28fce7c78568b61e6234d34d2cb793be001864fc24332621"
+        }
+      },
+      "event_digest": "19f711c709497ddedea5799d2cd50fa6983137da3422314162a09f51b53c4bfe",
+      "prev_hash": "f19c19f71c57c03a8a8ad608644a91994a664dd0d67e9cd4db9ee9c015156a2a",
+      "chain_hash": "2e9429fb1fa661b47645d0d19abe00c65b2ac10c3071f258802d0ca879665642"
+    },
+    {
+      "event": {
+        "ts": 1773592621.5701098,
+        "actor": "agent-worker-0",
+        "event_type": "COMMIT_VOTE",
+        "payload": {
+          "task_id": "task-001",
+          "voter": "agent-worker-0",
+          "winner": "agent-worker-0",
+          "digest": "c5fa3fac632be4ab28fce7c78568b61e6234d34d2cb793be001864fc24332621"
+        }
+      },
+      "event_digest": "6e1ba042c9f6f2a3480048dd06ef1ca9e1ed14f0b9b818054bdb6236e64eb265",
+      "prev_hash": "2e9429fb1fa661b47645d0d19abe00c65b2ac10c3071f258802d0ca879665642",
+      "chain_hash": "5c331b4eaa6c20ead7908beca547bd7ac9a602e91f997e9aae46764942950ee8"
+    },
+    {
+      "event": {
+        "ts": 1773592621.5701098,
+        "actor": "agent-worker-1",
+        "event_type": "COMMIT_VOTE",
+        "payload": {
+          "task_id": "task-001",
+          "voter": "agent-worker-1",
+          "winner": "agent-worker-0",
+          "digest": "c5fa3fac632be4ab28fce7c78568b61e6234d34d2cb793be001864fc24332621"
+        }
+      },
+      "event_digest": "bc0566707bde5b197a42c8d4f74fe194e8f99719a4a89513ab3964ed29d8160a",
+      "prev_hash": "5c331b4eaa6c20ead7908beca547bd7ac9a602e91f997e9aae46764942950ee8",
+      "chain_hash": "58798636589956d56dd2ee829905c0cca48205c86491c9f33b38c5a13f625633"
+    },
+    {
+      "event": {
+        "ts": 1773592621.5701098,
+        "actor": "agent-verifier",
+        "event_type": "COMMIT_VOTE",
+        "payload": {
+          "task_id": "task-001",
+          "voter": "agent-verifier",
+          "winner": "agent-worker-0",
+          "digest": "c5fa3fac632be4ab28fce7c78568b61e6234d34d2cb793be001864fc24332621"
+        }
+      },
+      "event_digest": "7c9ccea79eac77e4acc80bd0ea5fb8a65e043d5bfefa2e2f573928350b2ee6bc",
+      "prev_hash": "58798636589956d56dd2ee829905c0cca48205c86491c9f33b38c5a13f625633",
+      "chain_hash": "10e388ac503021771bbaf7a1e5708b3a25b236f7d592cdd2ce0d647b35f20d87"
+    },
+    {
+      "event": {
+        "ts": 1773592621.5701098,
+        "actor": "agent-worker-0",
+        "event_type": "EXEC_START",
+        "payload": {
+          "task_id": "task-001",
+          "worker_id": "agent-worker-0"
+        }
+      },
+      "event_digest": "41b92fc3ff748bfc879518dc2e4bfc96e3506d57aa63f8cdd39230f7a5c8950a",
+      "prev_hash": "10e388ac503021771bbaf7a1e5708b3a25b236f7d592cdd2ce0d647b35f20d87",
+      "chain_hash": "8086d3653e289b45b0f40b53098a39184a46fade57d0385f738fe405c68d9466"
+    },
+    {
+      "event": {
+        "ts": 1773592621.5701098,
+        "actor": "agent-worker-0",
+        "event_type": "EXEC_START",
+        "payload": {
+          "task_id": "defense-0x1234567890abcdef1234567890abcdef12345678",
+          "executor": "agent-worker-0",
+          "tx_hash": "0xa40998c54ca8639f5509eed30d14747670b6f2b8028c20ea299d59cd0be16264"
+        }
+      },
+      "event_digest": "79cd0b523d9ae0b831abfb60aa147240b623f9f0507753efdc9bf2b34062ab8a",
+      "prev_hash": "8086d3653e289b45b0f40b53098a39184a46fade57d0385f738fe405c68d9466",
+      "chain_hash": "a38f16fbaa8a9b6412f1e497f7028eb4e673acc8f288976a3f5d76a924c535c8"
+    },
+    {
+      "event": {
+        "ts": 1773592621.5701098,
+        "actor": "agent-worker-0",
+        "event_type": "EXEC_DONE",
+        "payload": {
+          "task_id": "task-001",
+          "worker_id": "agent-worker-0",
+          "result_digest": "0xa40998c54ca8639f5509eed30d14747670b6f2b8028c20ea299d59cd0be16264",
+          "wdk_tx": "0xa40998c54ca8639f5509eed30d14747670b6f2b8028c20ea299d59cd0be16264"
+        }
+      },
+      "event_digest": "6d444d6af6d019a910dac27f150c97873ba1234d53b0025f25c91ed068a598cc",
+      "prev_hash": "a38f16fbaa8a9b6412f1e497f7028eb4e673acc8f288976a3f5d76a924c535c8",
+      "chain_hash": "5fd7f194854f374fcab11926b5e6cc0656c3fffb3b071fbea76300960a4b7673"
+    },
+    {
+      "event": {
+        "ts": 1773592621.5701098,
+        "actor": "agent-worker-0",
+        "event_type": "THREAT_GOSSIP",
+        "payload": {
+          "threat_id": "threat-999",
+          "details": "IP:192.168.1.666",
+          "reporter": "agent-worker-0"
+        }
+      },
+      "event_digest": "4d0f7f8a3e122ecd9778e5106df9ec8a8bbc9b00c957ac430ce7799fc42705b5",
+      "prev_hash": "5fd7f194854f374fcab11926b5e6cc0656c3fffb3b071fbea76300960a4b7673",
+      "chain_hash": "68ae7b5328b4b425e0b3402422353b05e1b880e1264726e4cd9e88647683bc29"
+    },
+    {
+      "event": {
+        "ts": 1773592621.5701098,
+        "actor": "agent-scout",
+        "event_type": "VERIFY_ACK",
+        "payload": {
+          "task_id": "task-001",
+          "agent_id": "agent-scout",
+          "event_hash": "68ae7b5328b4b425e0b3402422353b05e1b880e1264726e4cd9e88647683bc29"
+        }
+      },
+      "event_digest": "10ead24fa2767cde4c8381b6a604d3a90ecbda0b2a6fd6e733f9761813e1bf82",
+      "prev_hash": "68ae7b5328b4b425e0b3402422353b05e1b880e1264726e4cd9e88647683bc29",
+      "chain_hash": "6a8b0c6e8bcf054054c72606382e81258eac8d432458a3705f0ca7ca5b87febf"
+    },
+    {
+      "event": {
+        "ts": 1773592621.5701098,
+        "actor": "agent-worker-0",
+        "event_type": "VERIFY_ACK",
+        "payload": {
+          "task_id": "task-001",
+          "agent_id": "agent-worker-0",
+          "event_hash": "68ae7b5328b4b425e0b3402422353b05e1b880e1264726e4cd9e88647683bc29"
+        }
+      },
+      "event_digest": "14fa952d4dca7f1e86e4544c3b9aa86b7ee92ce2999364710d970be89bc0e28a",
+      "prev_hash": "6a8b0c6e8bcf054054c72606382e81258eac8d432458a3705f0ca7ca5b87febf",
+      "chain_hash": "3ea50ac978775504e6fbfa91e32da0fa1a2af8d0b2e48b68b81255b8444b3a83"
+    },
+    {
+      "event": {
+        "ts": 1773592621.5701098,
+        "actor": "agent-worker-1",
+        "event_type": "VERIFY_ACK",
+        "payload": {
+          "task_id": "task-001",
+          "agent_id": "agent-worker-1",
+          "event_hash": "68ae7b5328b4b425e0b3402422353b05e1b880e1264726e4cd9e88647683bc29"
+        }
+      },
+      "event_digest": "6a60e418e63bf2cb0110cef17f5b0c926caff12badc27513dab60dcf78bf394c",
+      "prev_hash": "3ea50ac978775504e6fbfa91e32da0fa1a2af8d0b2e48b68b81255b8444b3a83",
+      "chain_hash": "0efe9ec12fd96a683279ac4c2ae4722c21e083b930936dff80206634f127f38e"
+    },
+    {
+      "event": {
+        "ts": 1773592621.5701098,
+        "actor": "agent-verifier",
+        "event_type": "VERIFY_ACK",
+        "payload": {
+          "task_id": "task-001",
+          "agent_id": "agent-verifier",
+          "event_hash": "68ae7b5328b4b425e0b3402422353b05e1b880e1264726e4cd9e88647683bc29"
+        }
+      },
+      "event_digest": "e396b98583962614541cacb1bdc96fcfda3f8dc3802bf1fd4a99728e4fb5ad3f",
+      "prev_hash": "0efe9ec12fd96a683279ac4c2ae4722c21e083b930936dff80206634f127f38e",
+      "chain_hash": "9289d4b7934f1657b7f2046ce645594bf6076f1a9eddbbeede327639124d07aa"
+    }
+  ],
+  "multisig_summary": {
+    "agent-scout": "207a76b59b93ded9e941c2cae0e61e742b6e867ebc60f9b3a10666b5a91c8555",
+    "agent-worker-0": "7e12c192b2f2bfada30426b5e6bb248592b7002621de30c54560699beb894bba",
+    "agent-worker-1": "6eb2f41eb7490dd487d815acb03ce67d176bd664192e0e067d9ce07403db7261",
+    "agent-verifier": "3db27ca0c6cbd2e20e5f6d791642e5e1c08ecfdf4118c2372e433c4499285d6f"
+  }
+}

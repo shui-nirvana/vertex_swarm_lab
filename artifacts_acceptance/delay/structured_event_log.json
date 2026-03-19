@@ -1,0 +1,169 @@
+[
+  {
+    "ts": 1773590410.5749586,
+    "actor": "agent-planner",
+    "event_type": "DISCOVER",
+    "payload": {
+      "capability": "planner"
+    }
+  },
+  {
+    "ts": 1773590410.5749586,
+    "actor": "agent-worker-a",
+    "event_type": "DISCOVER",
+    "payload": {
+      "capability": "worker"
+    }
+  },
+  {
+    "ts": 1773590410.5749586,
+    "actor": "agent-worker-b",
+    "event_type": "DISCOVER",
+    "payload": {
+      "capability": "worker"
+    }
+  },
+  {
+    "ts": 1773590410.5749586,
+    "actor": "agent-planner",
+    "event_type": "HEARTBEAT",
+    "payload": {
+      "capability": "planner"
+    }
+  },
+  {
+    "ts": 1773590410.5749586,
+    "actor": "agent-worker-a",
+    "event_type": "HEARTBEAT",
+    "payload": {
+      "capability": "worker"
+    }
+  },
+  {
+    "ts": 1773590410.5749586,
+    "actor": "agent-worker-b",
+    "event_type": "HEARTBEAT",
+    "payload": {
+      "capability": "worker"
+    }
+  },
+  {
+    "ts": 1773590410.5749586,
+    "actor": "agent-planner",
+    "event_type": "TASK_OFFER",
+    "payload": {
+      "task_id": "task-001",
+      "mission": "triage_incident_bundle",
+      "budget_ceiling": 10.0,
+      "constraints": {
+        "latency_ms_max": 500
+      }
+    }
+  },
+  {
+    "ts": 1773590410.5749586,
+    "actor": "agent-worker-a",
+    "event_type": "BID",
+    "payload": {
+      "task_id": "task-001",
+      "agent_id": "agent-worker-a",
+      "price": 8.0,
+      "eta_ms": 150,
+      "capacity": 1
+    }
+  },
+  {
+    "ts": 1773590410.6566281,
+    "actor": "agent-worker-b",
+    "event_type": "BID",
+    "payload": {
+      "task_id": "task-001",
+      "agent_id": "agent-worker-b",
+      "price": 6.0,
+      "eta_ms": 180,
+      "capacity": 1
+    }
+  },
+  {
+    "ts": 1773590410.7372077,
+    "actor": "agent-planner",
+    "event_type": "COMMIT_VOTE",
+    "payload": {
+      "task_id": "task-001",
+      "voter": "agent-planner",
+      "winner": "agent-worker-b",
+      "digest": "2be5e19f0e4e26562efad8d7ea1432775337ea5da7a259954956a9fac80195db"
+    }
+  },
+  {
+    "ts": 1773590410.7372077,
+    "actor": "agent-worker-a",
+    "event_type": "COMMIT_VOTE",
+    "payload": {
+      "task_id": "task-001",
+      "voter": "agent-worker-a",
+      "winner": "agent-worker-b",
+      "digest": "2be5e19f0e4e26562efad8d7ea1432775337ea5da7a259954956a9fac80195db"
+    }
+  },
+  {
+    "ts": 1773590410.7372077,
+    "actor": "agent-worker-b",
+    "event_type": "COMMIT_VOTE",
+    "payload": {
+      "task_id": "task-001",
+      "voter": "agent-worker-b",
+      "winner": "agent-worker-b",
+      "digest": "2be5e19f0e4e26562efad8d7ea1432775337ea5da7a259954956a9fac80195db"
+    }
+  },
+  {
+    "ts": 1773590410.7372077,
+    "actor": "agent-worker-b",
+    "event_type": "EXEC_START",
+    "payload": {
+      "task_id": "task-001",
+      "worker_id": "agent-worker-b"
+    }
+  },
+  {
+    "ts": 1773590410.7372077,
+    "actor": "agent-worker-b",
+    "event_type": "EXEC_DONE",
+    "payload": {
+      "task_id": "task-001",
+      "worker_id": "agent-worker-b",
+      "result_digest": "f592d8458cf09bf8b6522e90ff63ce4d15a29c1eca4f4ac13f64f726e1e5747c"
+    }
+  },
+  {
+    "ts": 1773590410.7372077,
+    "actor": "agent-planner",
+    "event_type": "VERIFY_ACK",
+    "payload": {
+      "task_id": "task-001",
+      "agent_id": "agent-planner",
+      "event_hash": "e9df19743edfba4c6bcd62da48f6fcfff1028987854d6ffac46c022ab5c83dd7"
+    }
+  },
+  {
+    "ts": 1773590410.7372077,
+    "actor": "agent-worker-a",
+    "event_type": "VERIFY_ACK",
+    "payload": {
+      "task_id": "task-001",
+      "agent_id": "agent-worker-a",
+      "event_hash": "e9df19743edfba4c6bcd62da48f6fcfff1028987854d6ffac46c022ab5c83dd7"
+    }
+  },
+  {
+    "ts": 1773590410.7372077,
+    "actor": "agent-worker-b",
+    "event_type": "VERIFY_ACK",
+    "payload": {
+      "task_id": "task-001",
+      "agent_id": "agent-worker-b",
+      "event_hash": "e9df19743edfba4c6bcd62da48f6fcfff1028987854d6ffac46c022ab5c83dd7"
+    }
+  }
+]
