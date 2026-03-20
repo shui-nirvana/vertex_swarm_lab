@@ -15,3 +15,5 @@ env/
 artifacts/
 artifacts_acceptance/
 artifacts_drop/
+tools/
+DESIGN_AND_TEST_CASES.zh-en.md

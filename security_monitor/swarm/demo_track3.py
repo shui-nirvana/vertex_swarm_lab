@@ -2,7 +2,7 @@ import argparse
 import json
 import os
 import time
-from typing import Any, Dict, List, Literal, Tuple, TypedDict, cast
+from typing import Any, Dict, List, Literal, Optional, Tuple, TypedDict, cast
 
 from security_monitor.integration.ai_engine import AIRiskEngine
 from security_monitor.integration.settlement import SettlementEngine
@@ -26,6 +26,7 @@ class DemoSummary(TypedDict):
     proof_path: str
     commit_log_path: str
     settlement_tx_hash: str
+    transport_backend: str
     checks: Dict[str, bool]
 
 
@@ -41,6 +42,7 @@ class WarmupSummary(TypedDict):
     heartbeat_window_seconds: int
     outage_seconds: int
     mirror_latency_ms: float
+    transport_backend: str
     checks: Dict[str, bool]
 
 
@@ -48,9 +50,19 @@ class FoxSwarmNetwork(SwarmNetwork):
     """
     SwarmNetwork extended with FoxMQ integration for P2P simulation.
     """
-    def __init__(self, fault_injector: FaultInjector = None):
+    def __init__(
+        self,
+        fault_injector: FaultInjector = None,
+        foxmq_backend: str = "mqtt",
+        vertex_rs_bridge_cmd: Optional[str] = None,
+        foxmq_mqtt_addr: Optional[str] = None,
+    ):
         super().__init__(fault_injector)
-        self.fox_mq = FoxMQAdapter()
+        self.fox_mq = FoxMQAdapter(
+            backend=foxmq_backend,
+            bridge_cmd=vertex_rs_bridge_cmd,
+            mqtt_addr=foxmq_mqtt_addr,
+        )
         self.fox_mq.join_network("swarm-control")
 
     def broadcast(self, envelope: Dict[str, Any]) -> None:
@@ -98,13 +110,23 @@ def _create_agents(network: SwarmNetwork, worker_count: int = 2) -> Tuple[ScoutA
 
 
 def run_demo(
-    output_dir: str, fault_mode: Literal["none", "delay", "drop"], worker_count: int = 2
+    output_dir: str,
+    fault_mode: Literal["none", "delay", "drop"],
+    worker_count: int = 2,
+    foxmq_backend: str = "mqtt",
+    vertex_rs_bridge_cmd: Optional[str] = None,
+    foxmq_mqtt_addr: Optional[str] = None,
 ) -> DemoSummary:
     # Use FoxSwarmNetwork for P2P simulation
     injector = FaultInjector()
     if fault_mode == "delay":
         injector.delayed_messages_ms["BID"] = 80
-    network = FoxSwarmNetwork(fault_injector=injector)
+    network = FoxSwarmNetwork(
+        fault_injector=injector,
+        foxmq_backend=foxmq_backend,
+        vertex_rs_bridge_cmd=vertex_rs_bridge_cmd,
+        foxmq_mqtt_addr=foxmq_mqtt_addr,
+    )
     
     planner, nodes = _create_agents(network, worker_count)
     # Cast planner to ScoutAgent for type checking
@@ -240,11 +262,18 @@ def run_demo(
         "proof_path": proof_path,
         "commit_log_path": commit_log_path,
         "settlement_tx_hash": settlement_result["tx_hash"],
+        "transport_backend": foxmq_backend,
         "checks": checks,
     }
 
 
-def run_acceptance(output_dir: str, worker_count: int = 2) -> AcceptanceSummary:
+def run_acceptance(
+    output_dir: str,
+    worker_count: int = 2,
+    foxmq_backend: str = "mqtt",
+    vertex_rs_bridge_cmd: Optional[str] = None,
+    foxmq_mqtt_addr: Optional[str] = None,
+) -> AcceptanceSummary:
     scenarios: Dict[str, DemoSummary] = {}
     for mode in ("none", "delay", "drop"):
         scenario_dir = os.path.join(output_dir, mode)
@@ -252,6 +281,9 @@ def run_acceptance(output_dir: str, worker_count: int = 2) -> AcceptanceSummary:
             output_dir=scenario_dir,
             fault_mode=cast(Literal["none", "delay", "drop"], mode),
             worker_count=worker_count,
+            foxmq_backend=foxmq_backend,
+            vertex_rs_bridge_cmd=vertex_rs_bridge_cmd,
+            foxmq_mqtt_addr=foxmq_mqtt_addr,
         )
     criteria = {
         "coordination_correctness": all(
@@ -292,8 +324,12 @@ def run_warmup(
     outage_seconds: int = 10,
     heartbeat_seconds: float = 1.0,
     stale_after_seconds: float = 3.0,
+    foxmq_backend: str = "mqtt",
+    vertex_rs_bridge_cmd: Optional[str] = None,
+    foxmq_mqtt_addr: Optional[str] = None,
 ) -> WarmupSummary:
-    FoxMQAdapter.reset_simulation()
+    if foxmq_backend == "simulated":
+        FoxMQAdapter.reset_simulation()
     channel = f"warmup-{int(time.time() * 1000)}"
     logs: List[str] = []
     nonce_counter = {"agent-a": 0, "agent-b": 0}
@@ -327,8 +363,18 @@ def run_warmup(
     }
 
     adapters = {
-        "agent-a": FoxMQAdapter(node_id="agent-a"),
-        "agent-b": FoxMQAdapter(node_id="agent-b"),
+        "agent-a": FoxMQAdapter(
+            node_id="agent-a",
+            backend=foxmq_backend,
+            bridge_cmd=vertex_rs_bridge_cmd,
+            mqtt_addr=foxmq_mqtt_addr,
+        ),
+        "agent-b": FoxMQAdapter(
+            node_id="agent-b",
+            backend=foxmq_backend,
+            bridge_cmd=vertex_rs_bridge_cmd,
+            mqtt_addr=foxmq_mqtt_addr,
+        ),
     }
 
     for adapter in adapters.values():
@@ -579,6 +625,7 @@ def run_warmup(
         "heartbeat_window_seconds": heartbeat_window_seconds,
         "outage_seconds": outage_seconds,
         "mirror_latency_ms": round(mirror_latency_ms, 3),
+        "transport_backend": foxmq_backend,
         "checks": checks,
     }
 
@@ -632,6 +679,22 @@ def main() -> int:
         default=3.0,
         help="Mark peer stale after this timeout in warmup mode",
     )
+    parser.add_argument(
+        "--foxmq-backend",
+        choices=["simulated", "official", "mqtt"],
+        default=os.getenv("FOXMQ_BACKEND", "mqtt"),
+        help="FoxMQ transport backend",
+    )
+    parser.add_argument(
+        "--vertex-rs-bridge-cmd",
+        default=os.getenv("VERTEX_RS_BRIDGE_CMD", ""),
+        help="Rust bridge command used by official backend, example: vertex-rs-bridge --host 127.0.0.1 --port 1883 --stdio",
+    )
+    parser.add_argument(
+        "--foxmq-mqtt-addr",
+        default=os.getenv("FOXMQ_MQTT_ADDR", "127.0.0.1:1883"),
+        help="MQTT broker address used by mqtt backend, format host:port",
+    )
     args = parser.parse_args()
 
     if args.mode == "warmup":
@@ -641,24 +704,42 @@ def main() -> int:
             outage_seconds=args.warmup_outage_seconds,
             heartbeat_seconds=args.heartbeat_seconds,
             stale_after_seconds=args.stale_after_seconds,
+            foxmq_backend=args.foxmq_backend,
+            vertex_rs_bridge_cmd=args.vertex_rs_bridge_cmd or None,
+            foxmq_mqtt_addr=args.foxmq_mqtt_addr or None,
         )
         print("\nTRACK3 WARMUP SUMMARY")
         print(f"Proof Log:    {warmup['proof_log_path']}")
         print(f"State File:   {warmup['state_snapshot_path']}")
         print(f"Mirror Latency(ms): {warmup['mirror_latency_ms']}")
+        print(f"Transport:    {warmup['transport_backend']}")
         print(f"Checks:       {warmup['checks']}")
         return 0
 
     if args.mode == "acceptance":
-        acceptance = run_acceptance(output_dir=args.output_dir, worker_count=args.workers)
+        acceptance = run_acceptance(
+            output_dir=args.output_dir,
+            worker_count=args.workers,
+            foxmq_backend=args.foxmq_backend,
+            vertex_rs_bridge_cmd=args.vertex_rs_bridge_cmd or None,
+            foxmq_mqtt_addr=args.foxmq_mqtt_addr or None,
+        )
         print("\nTRACK3 ACCEPTANCE SUMMARY")
         print(f"Report: {acceptance['report_path']}")
+        print(f"Transport: {args.foxmq_backend}")
         for name, passed in acceptance["criteria"].items():
             print(f"{name}: {'PASS' if passed else 'FAIL'}")
         return 0
 
     selected_fault = cast(Literal["none", "delay", "drop"], args.fault)
-    summary = run_demo(output_dir=args.output_dir, fault_mode=selected_fault, worker_count=args.workers)
+    summary = run_demo(
+        output_dir=args.output_dir,
+        fault_mode=selected_fault,
+        worker_count=args.workers,
+        foxmq_backend=args.foxmq_backend,
+        vertex_rs_bridge_cmd=args.vertex_rs_bridge_cmd or None,
+        foxmq_mqtt_addr=args.foxmq_mqtt_addr or None,
+    )
     print("\nTRACK3 DEMO SUMMARY")
     print(f"Task ID:      {summary['task_id']}")
     print(f"Winner:       {summary['winner']}")
@@ -671,6 +752,7 @@ def main() -> int:
     print(f"Commit Log:   {summary['commit_log_path']}")
     print(f"Proof File:   {summary['proof_path']}")
     print(f"Settlement:   {summary['settlement_tx_hash']}")
+    print(f"Transport:    {summary['transport_backend']}")
     print(f"Checks:       {summary['checks']}")
     return 0
 
