@@ -32,6 +32,10 @@ class Track3SwarmTests(unittest.TestCase):
             self.assertGreater(summary["event_count"], 0)
             self.assertTrue(os.path.exists(summary["event_log_path"]))
             self.assertTrue(os.path.exists(summary["proof_path"]))
+            self.assertTrue(summary["nanopayment_tx_hash"].startswith("0x"))
+            self.assertTrue(summary["checks"]["economy_payment_success"])
+            self.assertTrue(summary["checks"]["dual_sentinel_consensus"])
+            self.assertTrue(summary["checks"]["autonomous_penalty_triggered"])
 
     def test_loop_with_node_drop(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -101,6 +105,19 @@ class Track3SwarmTests(unittest.TestCase):
                 events = json.load(f)
             gossip_events = [event for event in events if event["event_type"] == "THREAT_GOSSIP"]
             self.assertGreaterEqual(len(gossip_events), 1)
+
+    def test_agent_economy_and_dual_sentinel_events_recorded(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            summary = run_demo(output_dir=tmp, fault_mode="none", foxmq_backend="simulated")
+            with open(summary["event_log_path"], "r", encoding="utf-8") as f:
+                events = json.load(f)
+            event_types = {event["event_type"] for event in events}
+            self.assertIn("SCAN_QUOTE", event_types)
+            self.assertIn("NANOPAYMENT", event_types)
+            self.assertIn("THREAT_REPORT", event_types)
+            self.assertIn("THREAT_CONFIRM", event_types)
+            self.assertIn("BLOCK_EXEC", event_types)
+            self.assertIn("REPUTATION_PENALTY", event_types)
 
     def test_warmup_proof_flow(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

@@ -34,15 +34,8 @@ class ScoutAgent(AgentNode):
     def broadcast_threat(self, target: str, details: Dict[str, Any]) -> None:
         """Broadcast threat intelligence to the Hive Memory."""
         payload = {
-            "target": target,
-            "details": details,
-            "reporter": self.agent_id
+            "threat_id": target,
+            "details": str(details),
+            "reporter": self.agent_id,
         }
-        # In a real system, this would go to a gossip protocol
-        # For now, we use the existing message structure if possible, 
-        # or just log it if the message type isn't fully supported by the base class yet.
-        # Checking base class... it has _broadcast but maybe not THREAT_GOSSIP handling fully wired?
-        # The base class has `threat_ledger`.
-        
-        # We can simulate the message type
-        self._broadcast("THREAT_GOSSIP", payload)
+        self._broadcast(THREAT_GOSSIP, payload)

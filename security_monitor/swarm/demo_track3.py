@@ -7,8 +7,18 @@ from typing import Any, Dict, List, Literal, Optional, Tuple, TypedDict, cast
 from security_monitor.integration.ai_engine import AIRiskEngine
 from security_monitor.integration.settlement import SettlementEngine
 from security_monitor.integration.foxmq_adapter import FoxMQAdapter
+from security_monitor.integration.wdk_settlement import WDKSettlementAdapter
 from security_monitor.swarm.agent_node import AgentNode, SwarmNetwork
 from security_monitor.swarm.fault_injector import FaultInjector
+from security_monitor.swarm.messages import (
+    BLOCK_EXEC,
+    NANOPAYMENT,
+    REPUTATION_PENALTY,
+    SCAN_QUOTE,
+    SCAN_RESULT,
+    THREAT_CONFIRM,
+    THREAT_REPORT,
+)
 from security_monitor.swarm.proof import build_hash_chain, build_proof
 from security_monitor.swarm.security import sign_payload, verify_payload
 from security_monitor.roles import ScoutAgent, GuardianAgent, VerifierAgent
@@ -26,6 +36,7 @@ class DemoSummary(TypedDict):
     proof_path: str
     commit_log_path: str
     settlement_tx_hash: str
+    nanopayment_tx_hash: str
     transport_backend: str
     checks: Dict[str, bool]
 
@@ -82,6 +93,15 @@ def _create_agents(network: SwarmNetwork, worker_count: int = 2) -> Tuple[ScoutA
         is_planner=True,
     )
     nodes = [scout]
+    scout_b = ScoutAgent(
+        agent_id="agent-scout-b",
+        capability="scout",
+        secret="secret-scout-b",
+        bid_profile={"price": 98.0, "eta_ms": 998, "capacity": 0},
+        network=network,
+        is_planner=True,
+    )
+    nodes.append(scout_b)
 
     # Guardian (Worker)
     for i in range(worker_count):
@@ -129,8 +149,8 @@ def run_demo(
     )
     
     planner, nodes = _create_agents(network, worker_count)
-    # Cast planner to ScoutAgent for type checking
     scout = cast(ScoutAgent, planner)
+    scout_b = cast(ScoutAgent, next(node for node in nodes if node.agent_id == "agent-scout-b"))
 
     for node in nodes:
         node.discover()
@@ -152,18 +172,109 @@ def run_demo(
         if worker_count < 2:
             pass
 
-    # Scout analyzes target before offering task
+    payment_engine = WDKSettlementAdapter()
+    payment_engine._balances["agent-client"] = {"USDT": 5.0}
+    protection_fee = 0.5
+    scout._broadcast(
+        SCAN_QUOTE,
+        {
+            "requester": "agent-client",
+            "provider": "agent-scout",
+            "scan_target": "0x1234567890abcdef1234567890abcdef12345678",
+            "fee": protection_fee,
+            "token": "USDT",
+            "service": "pre_tx_scan",
+        },
+    )
+    payment_result = payment_engine.transfer(
+        from_address="agent-client",
+        to_address="agent-scout",
+        amount=protection_fee,
+        token="USDT",
+    )
+    if not payment_result["success"]:
+        raise RuntimeError(f"nanopayment failed: {payment_result}")
+    scout._broadcast(
+        NANOPAYMENT,
+        {
+            "from": "agent-client",
+            "to": "agent-scout",
+            "amount": protection_fee,
+            "token": "USDT",
+            "tx_hash": payment_result["tx_hash"],
+        },
+    )
+
     target_address = "0x1234567890abcdef1234567890abcdef12345678"
     analysis = scout.analyze_target(target_address, amount=100.0)
-    
+    scout._broadcast(
+        SCAN_RESULT,
+        {
+            "requester": "agent-client",
+            "provider": "agent-scout",
+            "target": target_address,
+            "safe": analysis["safe"],
+            "risk": analysis["risk"],
+            "reason": analysis["reason"],
+        },
+    )
     if not analysis["safe"]:
         raise RuntimeError(f"Scout rejected target: {analysis}")
 
-    # Scout offers task with budget based on analysis
+    malicious_target = "0x6666666666666666666666666666666666666666"
+    primary_threat = scout.analyze_target(malicious_target, amount=100.0)
+    secondary_threat = scout_b.analyze_target(malicious_target, amount=100.0)
+    dual_sentinel_confirmed = (not primary_threat["safe"]) and (not secondary_threat["safe"])
+    block_executed = False
+    penalty_triggered = False
+    reputation_registry = {
+        "agent-client": 100,
+    }
+    if dual_sentinel_confirmed:
+        scout._broadcast(
+            THREAT_REPORT,
+            {
+                "target": malicious_target,
+                "reporter": scout.agent_id,
+                "risk": primary_threat["risk"],
+                "reason": primary_threat["reason"],
+            },
+        )
+        scout_b._broadcast(
+            THREAT_CONFIRM,
+            {
+                "target": malicious_target,
+                "confirmer": scout_b.agent_id,
+                "risk": secondary_threat["risk"],
+                "reason": secondary_threat["reason"],
+            },
+        )
+        block_executed = True
+        scout._broadcast(
+            BLOCK_EXEC,
+            {
+                "target": malicious_target,
+                "required_confirmations": 2,
+                "confirmations": [scout.agent_id, scout_b.agent_id],
+                "action": "block_transaction",
+            },
+        )
+        reputation_registry["agent-client"] = max(0, reputation_registry["agent-client"] - 25)
+        penalty_triggered = True
+        scout._broadcast(
+            REPUTATION_PENALTY,
+            {
+                "offender": "agent-client",
+                "delta": -25,
+                "new_score": reputation_registry["agent-client"],
+                "reason": "confirmed_malicious_target",
+            },
+        )
+
     scout.offer_task(
         task_id="task-001",
         mission=target_address,
-        budget_ceiling=float(analysis["suggested_price"]) * 10, # Add buffer
+        budget_ceiling=float(analysis["suggested_price"]) * 10,
         constraints={"latency_ms_max": 500},
     )
 
@@ -204,7 +315,6 @@ def run_demo(
             "tx_hash": execution_result.get("wdk_tx", "none")
         }
 
-    # Hive Memory: Simulate winner detecting a threat during execution and gossiping it
     detected_threat = "IP:192.168.1.666"
     network.nodes[winner_id].gossip_threat("threat-999", detected_threat)
 
@@ -248,6 +358,11 @@ def run_demo(
         "resilience_maintained": winner_id == expected_winner,
         "hive_memory_consistent": hive_memory_consistent and len(gossip_events) >= 1,
         "settlement_success": settlement_result["status"] == "success",
+        "economy_payment_success": bool(payment_result["success"]),
+        "economy_service_settled": str(payment_result["tx_hash"]).startswith("0x"),
+        "dual_sentinel_consensus": dual_sentinel_confirmed,
+        "autonomous_block_triggered": block_executed,
+        "autonomous_penalty_triggered": penalty_triggered and reputation_registry["agent-client"] == 75,
     }
 
     return {
@@ -262,6 +377,7 @@ def run_demo(
         "proof_path": proof_path,
         "commit_log_path": commit_log_path,
         "settlement_tx_hash": settlement_result["tx_hash"],
+        "nanopayment_tx_hash": payment_result["tx_hash"],
         "transport_backend": foxmq_backend,
         "checks": checks,
     }
@@ -298,6 +414,16 @@ def run_acceptance(
         "security_posture": all(scenario["checks"]["verify_ack_emitted"] for scenario in scenarios.values()),
         "hive_memory": all(scenario["checks"]["hive_memory_consistent"] for scenario in scenarios.values()),
         "settlement": all(scenario["checks"]["settlement_success"] for scenario in scenarios.values()),
+        "agent_economy": all(
+            scenario["checks"]["economy_payment_success"] and scenario["checks"]["economy_service_settled"]
+            for scenario in scenarios.values()
+        ),
+        "autonomous_governance": all(
+            scenario["checks"]["dual_sentinel_consensus"]
+            and scenario["checks"]["autonomous_block_triggered"]
+            and scenario["checks"]["autonomous_penalty_triggered"]
+            for scenario in scenarios.values()
+        ),
         "developer_clarity": all(
             os.path.exists(scenario["event_log_path"]) and os.path.exists(scenario["commit_log_path"])
             for scenario in scenarios.values()
@@ -391,6 +517,7 @@ def run_warmup(
             ensure_ascii=False,
         )
         logs.append(line)
+        print(line, flush=True)
 
     def _mark_stale() -> None:
         nonlocal stale_detected
