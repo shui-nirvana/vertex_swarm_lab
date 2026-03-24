@@ -1,9 +1,9 @@
 import logging
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Dict, Any
 
 from security_monitor.swarm.agent_node import AgentNode
-from security_monitor.swarm.messages import EXEC_DONE, VERIFY_ACK
+from security_monitor.swarm.messages import VERIFY_ACK
 
 logger = logging.getLogger(__name__)
 

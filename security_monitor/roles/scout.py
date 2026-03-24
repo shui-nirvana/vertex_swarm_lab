@@ -1,6 +1,6 @@
 import logging
 from dataclasses import dataclass, field
-from typing import Dict, Any, Optional
+from typing import Dict, Any
 
 from security_monitor.swarm.agent_node import AgentNode
 from security_monitor.integration.ai_engine import AIRiskEngine

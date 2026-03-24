@@ -288,7 +288,9 @@ class FoxMQAdapter:
         self._subscriptions: Dict[str, List[Callable[[Dict[str, Any]], None]]] = {}
         self._bridge_cmd = (bridge_cmd or "").strip()
         self._mqtt_addr = (mqtt_addr or "").strip()
-        self.backend = (backend or os.getenv("FOXMQ_BACKEND", "mqtt")).strip().lower()
+        env_backend = os.getenv("FOXMQ_BACKEND", "mqtt")
+        backend_value = backend if backend is not None else (env_backend if env_backend is not None else "mqtt")
+        self.backend = backend_value.strip().lower()
         if self.backend not in {"simulated", "official", "mqtt"}:
             raise ValueError(f"unsupported FoxMQ backend: {self.backend}")
         self._official_client: Optional[Any] = None

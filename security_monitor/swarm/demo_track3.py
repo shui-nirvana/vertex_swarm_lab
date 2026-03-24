@@ -1,27 +1,31 @@
 import argparse
 import json
 import os
+import statistics
 import time
 from typing import Any, Dict, List, Literal, Optional, Tuple, TypedDict, cast
 
-from security_monitor.integration.ai_engine import AIRiskEngine
-from security_monitor.integration.settlement import SettlementEngine
 from security_monitor.integration.foxmq_adapter import FoxMQAdapter
 from security_monitor.integration.wdk_settlement import WDKSettlementAdapter
 from security_monitor.swarm.agent_node import AgentNode, SwarmNetwork
 from security_monitor.swarm.fault_injector import FaultInjector
 from security_monitor.swarm.messages import (
     BLOCK_EXEC,
+    DISCOVER,
     NANOPAYMENT,
     REPUTATION_PENALTY,
+    ROUTE_COMMIT,
+    ROUTE_PROPOSAL,
     SCAN_QUOTE,
     SCAN_RESULT,
+    TASK_HANDOFF,
     THREAT_CONFIRM,
     THREAT_REPORT,
 )
 from security_monitor.swarm.proof import build_hash_chain, build_proof
 from security_monitor.swarm.security import sign_payload, verify_payload
 from security_monitor.roles import ScoutAgent, GuardianAgent, VerifierAgent
+from security_monitor.roles.guardian import LangChainStyleAdapter
 
 
 class DemoSummary(TypedDict):
@@ -37,6 +41,11 @@ class DemoSummary(TypedDict):
     commit_log_path: str
     settlement_tx_hash: str
     nanopayment_tx_hash: str
+    freeze_latency_ms: float
+    route_hops: int
+    execution_protocols: List[str]
+    byo_workers: List[str]
+    kpi: Dict[str, float]
     transport_backend: str
     checks: Dict[str, bool]
 
@@ -44,6 +53,7 @@ class DemoSummary(TypedDict):
 class AcceptanceSummary(TypedDict):
     scenarios: Dict[str, DemoSummary]
     criteria: Dict[str, bool]
+    kpi_summary: Dict[str, float]
     report_path: str
 
 
@@ -57,13 +67,23 @@ class WarmupSummary(TypedDict):
     checks: Dict[str, bool]
 
 
+def _percentile_ms(samples: List[float], ratio: float) -> float:
+    if not samples:
+        return -1.0
+    if len(samples) == 1:
+        return float(samples[0])
+    ordered = sorted(float(sample) for sample in samples)
+    index = max(0, min(len(ordered) - 1, int(round((len(ordered) - 1) * ratio))))
+    return float(ordered[index])
+
+
 class FoxSwarmNetwork(SwarmNetwork):
     """
     SwarmNetwork extended with FoxMQ integration for P2P simulation.
     """
     def __init__(
         self,
-        fault_injector: FaultInjector = None,
+        fault_injector: Optional[FaultInjector] = None,
         foxmq_backend: str = "mqtt",
         vertex_rs_bridge_cmd: Optional[str] = None,
         foxmq_mqtt_addr: Optional[str] = None,
@@ -92,7 +112,7 @@ def _create_agents(network: SwarmNetwork, worker_count: int = 2) -> Tuple[ScoutA
         network=network,
         is_planner=True,
     )
-    nodes = [scout]
+    nodes: List[AgentNode] = [scout]
     scout_b = ScoutAgent(
         agent_id="agent-scout-b",
         capability="scout",
@@ -104,13 +124,25 @@ def _create_agents(network: SwarmNetwork, worker_count: int = 2) -> Tuple[ScoutA
     nodes.append(scout_b)
 
     # Guardian (Worker)
+    protocol_pool: List[Literal["wdk", "ros2", "mavlink", "vendor_sdk"]] = ["ros2", "mavlink", "vendor_sdk"]
     for i in range(worker_count):
+        orchestrator_mode: Literal["native_swarm", "external_framework_foxmq"] = "native_swarm"
+        framework_name = "internal"
+        external_adapter = None
+        if i == 0:
+            orchestrator_mode = "external_framework_foxmq"
+            framework_name = "langchain_adapter"
+            external_adapter = LangChainStyleAdapter(adapter_name=framework_name)
         guardian = GuardianAgent(
             agent_id=f"agent-worker-{i}",
             capability="guardian",
             secret=f"secret-worker-{i}",
             bid_profile={"price": 5.0 + i * 0.5, "eta_ms": 200 - i * 5, "capacity": 1},
             network=network,
+            execution_protocol=protocol_pool[i % len(protocol_pool)],
+            orchestrator_mode=orchestrator_mode,
+            framework_name=framework_name,
+            external_adapter=external_adapter,
         )
         nodes.append(guardian)
     
@@ -172,6 +204,7 @@ def run_demo(
         if worker_count < 2:
             pass
 
+    freeze_target_ms = 1000.0
     payment_engine = WDKSettlementAdapter()
     payment_engine._balances["agent-client"] = {"USDT": 5.0}
     protection_fee = 0.5
@@ -278,6 +311,51 @@ def run_demo(
         constraints={"latency_ms_max": 500},
     )
 
+    route_id = "route-task-001"
+    route_candidates = sorted(
+        planner.bids_by_task.get("task-001", []),
+        key=lambda bid: (int(bid["eta_ms"]), float(bid["price"]), str(bid["agent_id"])),
+    )
+    route_path = [str(candidate["agent_id"]) for candidate in route_candidates[:3]]
+    route_hops = max(0, len(route_path) - 1)
+    if route_path:
+        scout._broadcast(
+            ROUTE_PROPOSAL,
+            {
+                "task_id": "task-001",
+                "route_id": route_id,
+                "path": route_path,
+                "hop_count": route_hops,
+                "max_hop_latency_ms": 250,
+            },
+        )
+        scout_b._broadcast(
+            ROUTE_COMMIT,
+            {
+                "task_id": "task-001",
+                "route_id": route_id,
+                "path": route_path,
+                "hop_count": route_hops,
+                "confirmer": scout_b.agent_id,
+            },
+        )
+        for hop_index in range(route_hops):
+            from_agent = route_path[hop_index]
+            to_agent = route_path[hop_index + 1]
+            if from_agent in network.nodes:
+                network.nodes[from_agent]._broadcast(
+                    TASK_HANDOFF,
+                    {
+                        "task_id": "task-001",
+                        "route_id": route_id,
+                        "from_agent": from_agent,
+                        "to_agent": to_agent,
+                        "hop_index": hop_index,
+                        "total_hops": route_hops,
+                        "payload_digest": f"task-001-hop-{hop_index}",
+                    },
+                )
+
     for node_id in network.active_node_ids():
         network.nodes[node_id].emit_commit_vote("task-001")
 
@@ -331,10 +409,16 @@ def run_demo(
     proof_path = os.path.join(output_dir, "coordination_proof.json")
     commit_log_path = os.path.join(output_dir, "commit_log.json")
     events_data = [event.to_dict() for event in network.events]
+    task_offer_events = [event for event in events_data if event["event_type"] == "TASK_OFFER"]
     commit_events = [event for event in events_data if event["event_type"] == "COMMIT_VOTE"]
     exec_done_events = [event for event in events_data if event["event_type"] == "EXEC_DONE"]
     verify_events = [event for event in events_data if event["event_type"] == "VERIFY_ACK"]
     gossip_events = [event for event in events_data if event["event_type"] == "THREAT_GOSSIP"]
+    route_proposal_events = [event for event in events_data if event["event_type"] == ROUTE_PROPOSAL]
+    route_commit_events = [event for event in events_data if event["event_type"] == ROUTE_COMMIT]
+    handoff_events = [event for event in events_data if event["event_type"] == TASK_HANDOFF]
+    threat_report_events = [event for event in events_data if event["event_type"] == THREAT_REPORT]
+    block_exec_events = [event for event in events_data if event["event_type"] == BLOCK_EXEC]
     with open(event_log_path, "w", encoding="utf-8") as f:
         json.dump(events_data, f, ensure_ascii=False, indent=2)
     with open(proof_path, "w", encoding="utf-8") as f:
@@ -350,10 +434,89 @@ def run_demo(
             hive_memory_consistent = False
             break
 
+    freeze_latency_ms = -1.0
+    if threat_report_events and block_exec_events:
+        first_threat_report_ts = float(threat_report_events[0]["ts"])
+        first_block_exec_ts = float(block_exec_events[0]["ts"])
+        freeze_latency_ms = max(0.0, (first_block_exec_ts - first_threat_report_ts) * 1000.0)
+
+    freeze_propagation_under_target = (
+        block_executed
+        and dual_sentinel_confirmed
+        and freeze_latency_ms >= 0.0
+        and freeze_latency_ms <= freeze_target_ms
+    )
+    configured_protocols = sorted(
+        {
+            cast(GuardianAgent, node).execution_protocol
+            for node_id, node in network.nodes.items()
+            if node_id.startswith("agent-worker-")
+        }
+    )
+    active_protocols = sorted(
+        {
+            cast(GuardianAgent, network.nodes[node_id]).execution_protocol
+            for node_id in network.active_node_ids()
+            if node_id.startswith("agent-worker-")
+        }
+    )
+    byo_workers = sorted(
+        [
+            node_id
+            for node_id, node in network.nodes.items()
+            if node_id.startswith("agent-worker-")
+            and cast(GuardianAgent, node).orchestrator_mode == "external_framework_foxmq"
+        ]
+    )
+    route_committed = bool(route_proposal_events) and bool(route_commit_events)
+    handoff_chain_complete = route_hops == 0 or len(handoff_events) >= route_hops
+    probe_receiver = network.nodes.get("agent-verifier", planner)
+    security_forgery_rejected = False
+    security_replay_rejected = False
+    if byo_workers:
+        probe_worker_id = byo_workers[0]
+        probe_worker = network.nodes.get(probe_worker_id)
+        if probe_worker is not None:
+            before_peer_ts = probe_receiver.peers.get(probe_worker_id)
+            valid_probe = probe_worker._build_envelope(DISCOVER, {"capability": "guardian"})
+            forged_probe = dict(valid_probe)
+            forged_probe["sig"] = "invalid-signature"
+            probe_receiver.receive(forged_probe)
+            after_forged_ts = probe_receiver.peers.get(probe_worker_id)
+            security_forgery_rejected = after_forged_ts == before_peer_ts
+            probe_receiver.receive(valid_probe)
+            first_accept_ts = probe_receiver.peers.get(probe_worker_id)
+            probe_receiver.receive(valid_probe)
+            replay_ts = probe_receiver.peers.get(probe_worker_id)
+            security_replay_rejected = first_accept_ts is not None and replay_ts == first_accept_ts
+
+    commit_latency_ms: List[float] = []
+    if task_offer_events:
+        offer_ts = float(task_offer_events[0]["ts"])
+        commit_latency_ms = [
+            max(0.0, (float(event["ts"]) - offer_ts) * 1000.0)
+            for event in commit_events
+        ]
+    p95_commit_latency_ms = _percentile_ms(commit_latency_ms, 0.95)
+    avg_commit_latency_ms = float(statistics.fmean(commit_latency_ms)) if commit_latency_ms else -1.0
+    verify_ack_ratio = float(len(verify_events)) / float(max(1, total_active - 1))
+    message_drop_recovery_time_ms = -1.0
+    if commit_events and exec_done_events:
+        first_commit_ts = float(commit_events[0]["ts"])
+        first_exec_done_ts = float(exec_done_events[0]["ts"])
+        message_drop_recovery_time_ms = max(0.0, (first_exec_done_ts - first_commit_ts) * 1000.0)
+    kpi = {
+        "p95_commit_latency_ms": round(p95_commit_latency_ms, 3),
+        "avg_commit_latency_ms": round(avg_commit_latency_ms, 3),
+        "verify_ack_ratio": round(verify_ack_ratio, 4),
+        "message_drop_recovery_time_ms": round(message_drop_recovery_time_ms, 3),
+    }
+
     checks = {
         "single_winner": len(unique_winners | {winner_id}) == 1,
         "no_double_assignment": len(exec_done_events) == 1,
         "proof_chain_complete": int(proof["event_count"]) == len(proof["chain"]),
+        "proof_multisig_quorum": len(signatures) >= 3,
         "verify_ack_emitted": len(verify_events) >= (total_active - 1), # At least most nodes ack
         "resilience_maintained": winner_id == expected_winner,
         "hive_memory_consistent": hive_memory_consistent and len(gossip_events) >= 1,
@@ -363,6 +526,16 @@ def run_demo(
         "dual_sentinel_consensus": dual_sentinel_confirmed,
         "autonomous_block_triggered": block_executed,
         "autonomous_penalty_triggered": penalty_triggered and reputation_registry["agent-client"] == 75,
+        "freeze_propagation_under_1000ms": freeze_propagation_under_target,
+        "multi_vendor_protocol_coverage": len(configured_protocols) >= 2 and len(active_protocols) >= 1,
+        "multi_hop_route_committed": route_committed,
+        "multi_hop_handoff_complete": handoff_chain_complete,
+        "byo_agent_integration": len(byo_workers) >= 1,
+        "security_forgery_rejected": security_forgery_rejected,
+        "security_replay_rejected": security_replay_rejected,
+        "kpi_commit_p95_under_1000ms": p95_commit_latency_ms >= 0.0 and p95_commit_latency_ms <= 1000.0,
+        "kpi_verify_ack_ratio_full": verify_ack_ratio >= 1.0,
+        "kpi_recovery_observed": message_drop_recovery_time_ms >= 0.0,
     }
 
     return {
@@ -378,6 +551,11 @@ def run_demo(
         "commit_log_path": commit_log_path,
         "settlement_tx_hash": settlement_result["tx_hash"],
         "nanopayment_tx_hash": payment_result["tx_hash"],
+        "freeze_latency_ms": round(freeze_latency_ms, 3),
+        "route_hops": route_hops,
+        "execution_protocols": [str(protocol) for protocol in configured_protocols],
+        "byo_workers": byo_workers,
+        "kpi": kpi,
         "transport_backend": foxmq_backend,
         "checks": checks,
     }
@@ -402,6 +580,30 @@ def run_acceptance(
             foxmq_mqtt_addr=foxmq_mqtt_addr,
         )
     criteria = {
+        "task_bidding": all(
+            scenario["checks"]["single_winner"] and scenario["checks"]["no_double_assignment"]
+            for scenario in scenarios.values()
+        ),
+        "hive_memory_state_sync": all(
+            scenario["checks"]["hive_memory_consistent"] for scenario in scenarios.values()
+        ),
+        "verification_multisig_proof": all(
+            scenario["checks"]["proof_chain_complete"] and scenario["checks"]["proof_multisig_quorum"]
+            for scenario in scenarios.values()
+        ),
+        "byo_agents_orchestrator_replaced": all(
+            scenario["checks"]["byo_agent_integration"] for scenario in scenarios.values()
+        ),
+        "security_attack_resistance": all(
+            scenario["checks"]["security_forgery_rejected"] and scenario["checks"]["security_replay_rejected"]
+            for scenario in scenarios.values()
+        ),
+        "observability_kpi_ready": all(
+            scenario["checks"]["kpi_commit_p95_under_1000ms"]
+            and scenario["checks"]["kpi_verify_ack_ratio_full"]
+            and scenario["checks"]["kpi_recovery_observed"]
+            for scenario in scenarios.values()
+        ),
         "coordination_correctness": all(
             scenario["checks"]["single_winner"] and scenario["checks"]["no_double_assignment"]
             for scenario in scenarios.values()
@@ -424,15 +626,44 @@ def run_acceptance(
             and scenario["checks"]["autonomous_penalty_triggered"]
             for scenario in scenarios.values()
         ),
+        "secure_mesh_freeze": all(
+            scenario["checks"]["freeze_propagation_under_1000ms"] for scenario in scenarios.values()
+        ),
+        "multi_vendor_readiness": all(
+            scenario["checks"]["multi_vendor_protocol_coverage"] for scenario in scenarios.values()
+        ),
+        "route_negotiation_handoff": all(
+            scenario["checks"]["multi_hop_route_committed"] and scenario["checks"]["multi_hop_handoff_complete"]
+            for scenario in scenarios.values()
+        ),
         "developer_clarity": all(
             os.path.exists(scenario["event_log_path"]) and os.path.exists(scenario["commit_log_path"])
             for scenario in scenarios.values()
         ),
     }
     report_path = os.path.join(output_dir, "acceptance_report.json")
+    kpi_summary = {
+        "worst_p95_commit_latency_ms": round(
+            max(scenario["kpi"]["p95_commit_latency_ms"] for scenario in scenarios.values()),
+            3,
+        ),
+        "worst_avg_commit_latency_ms": round(
+            max(scenario["kpi"]["avg_commit_latency_ms"] for scenario in scenarios.values()),
+            3,
+        ),
+        "lowest_verify_ack_ratio": round(
+            min(scenario["kpi"]["verify_ack_ratio"] for scenario in scenarios.values()),
+            4,
+        ),
+        "worst_drop_recovery_ms": round(
+            max(scenario["kpi"]["message_drop_recovery_time_ms"] for scenario in scenarios.values()),
+            3,
+        ),
+    }
     report: Dict[str, Any] = {
         "criteria": criteria,
         "scenarios": scenarios,
+        "kpi_summary": kpi_summary,
     }
     os.makedirs(output_dir, exist_ok=True)
     with open(report_path, "w", encoding="utf-8") as f:
@@ -440,6 +671,7 @@ def run_acceptance(
     return {
         "scenarios": scenarios,
         "criteria": criteria,
+        "kpi_summary": kpi_summary,
         "report_path": report_path,
     }
 

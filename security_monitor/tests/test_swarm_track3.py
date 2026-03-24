@@ -36,6 +36,24 @@ class Track3SwarmTests(unittest.TestCase):
             self.assertTrue(summary["checks"]["economy_payment_success"])
             self.assertTrue(summary["checks"]["dual_sentinel_consensus"])
             self.assertTrue(summary["checks"]["autonomous_penalty_triggered"])
+            self.assertGreaterEqual(summary["freeze_latency_ms"], 0.0)
+            self.assertTrue(summary["checks"]["freeze_propagation_under_1000ms"])
+            self.assertTrue(summary["checks"]["multi_vendor_protocol_coverage"])
+            self.assertTrue(summary["checks"]["multi_hop_route_committed"])
+            self.assertTrue(summary["checks"]["multi_hop_handoff_complete"])
+            self.assertTrue(summary["checks"]["byo_agent_integration"])
+            self.assertTrue(summary["checks"]["security_forgery_rejected"])
+            self.assertTrue(summary["checks"]["security_replay_rejected"])
+            self.assertTrue(summary["checks"]["kpi_commit_p95_under_1000ms"])
+            self.assertTrue(summary["checks"]["kpi_verify_ack_ratio_full"])
+            self.assertTrue(summary["checks"]["kpi_recovery_observed"])
+            self.assertGreaterEqual(summary["route_hops"], 1)
+            self.assertGreaterEqual(len(summary["execution_protocols"]), 2)
+            self.assertGreaterEqual(len(summary["byo_workers"]), 1)
+            self.assertGreaterEqual(summary["kpi"]["p95_commit_latency_ms"], 0.0)
+            self.assertGreaterEqual(summary["kpi"]["avg_commit_latency_ms"], 0.0)
+            self.assertGreaterEqual(summary["kpi"]["verify_ack_ratio"], 1.0)
+            self.assertGreaterEqual(summary["kpi"]["message_drop_recovery_time_ms"], 0.0)
 
     def test_loop_with_node_drop(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -96,6 +114,25 @@ class Track3SwarmTests(unittest.TestCase):
             acceptance = run_acceptance(output_dir=tmp, foxmq_backend="simulated")
             self.assertTrue(os.path.exists(acceptance["report_path"]))
             self.assertTrue(all(acceptance["criteria"].values()))
+            self.assertIn("secure_mesh_freeze", acceptance["criteria"])
+            self.assertIn("multi_vendor_readiness", acceptance["criteria"])
+            self.assertIn("route_negotiation_handoff", acceptance["criteria"])
+            self.assertIn("task_bidding", acceptance["criteria"])
+            self.assertIn("hive_memory_state_sync", acceptance["criteria"])
+            self.assertIn("verification_multisig_proof", acceptance["criteria"])
+            self.assertIn("byo_agents_orchestrator_replaced", acceptance["criteria"])
+            self.assertIn("security_attack_resistance", acceptance["criteria"])
+            self.assertIn("observability_kpi_ready", acceptance["criteria"])
+            self.assertTrue(acceptance["criteria"]["task_bidding"])
+            self.assertTrue(acceptance["criteria"]["hive_memory_state_sync"])
+            self.assertTrue(acceptance["criteria"]["verification_multisig_proof"])
+            self.assertTrue(acceptance["criteria"]["byo_agents_orchestrator_replaced"])
+            self.assertTrue(acceptance["criteria"]["security_attack_resistance"])
+            self.assertTrue(acceptance["criteria"]["observability_kpi_ready"])
+            self.assertIn("kpi_summary", acceptance)
+            self.assertGreaterEqual(acceptance["kpi_summary"]["worst_p95_commit_latency_ms"], 0.0)
+            self.assertGreaterEqual(acceptance["kpi_summary"]["lowest_verify_ack_ratio"], 1.0)
+            self.assertNotIn("peer_discovery_state_sync", acceptance["criteria"])
 
     def test_hive_memory_gossip_recorded(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -118,6 +155,11 @@ class Track3SwarmTests(unittest.TestCase):
             self.assertIn("THREAT_CONFIRM", event_types)
             self.assertIn("BLOCK_EXEC", event_types)
             self.assertIn("REPUTATION_PENALTY", event_types)
+            self.assertIn("ROUTE_PROPOSAL", event_types)
+            self.assertIn("ROUTE_COMMIT", event_types)
+            self.assertIn("TASK_HANDOFF", event_types)
+            self.assertGreaterEqual(summary["freeze_latency_ms"], 0.0)
+            self.assertTrue(summary["checks"]["freeze_propagation_under_1000ms"])
 
     def test_warmup_proof_flow(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -139,6 +181,18 @@ class Track3SwarmTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             summary = run_demo(output_dir=tmp, fault_mode="none", foxmq_backend="simulated")
             self.assertEqual(summary["transport_backend"], "simulated")
+
+    def test_scale_with_dozens_of_workers(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            summary = run_demo(
+                output_dir=tmp,
+                fault_mode="none",
+                worker_count=24,
+                foxmq_backend="simulated",
+            )
+            self.assertGreaterEqual(len(summary["active_nodes"]), 27)
+            self.assertTrue(summary["checks"]["single_winner"])
+            self.assertTrue(summary["checks"]["no_double_assignment"])
 
     def test_official_backend_uses_vertex_rs_bridge_when_configured(self) -> None:
         sentinel_client = object()
