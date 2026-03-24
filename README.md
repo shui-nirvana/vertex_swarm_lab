@@ -127,6 +127,10 @@ Latest validated evidence package:
 - Official (Rust bridge) hardened acceptance: `artifacts/competition_req_check/acceptance_official_10_hardened/acceptance_report.json`
 - Simulated hardened baseline: `artifacts/competition_req_check/acceptance_simulated_10_hardened/acceptance_report.json`
 
+GitHub-friendly progress snapshot:
+
+- `evidence/progress_evidence.json`
+
 ## Submission File Checklist
 
 Recommended files/folders to submit:
